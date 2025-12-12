@@ -2,15 +2,12 @@
  * Clash Verge Rev 全局扩展脚本（懒人配置）/ Mihomo Party 覆写脚本
  * URL: https://github.com/dahaha-365/YaNet/
  *
- * 优化目标：
- * 1. 实现策略组的三层嵌套：全局自动/手动入口 -> 地区手动组 -> 地区自动组。
- * 2. 将所有分流策略组（如：谷歌服务、国外网站）的代理指向统一到 '🚀 选择节点'。
+ * 修复：TypeError: not a function 错误。
+ * 优化：实现策略组的三层嵌套：全局自动/手动入口 -> 地区手动组 -> 地区自动组。
  */
 
-/** * 整个脚本的总开关，在Mihomo Party使用的话，请保持为true * true = 启用 * false = 禁用 */
 const enable = true
 
-/** * 分流规则配置，会自动生成对应的策略组 * 设置的时候可遵循“最小，可用”原则，把自己不需要的规则全禁用掉，提高效率 * true = 启用 * false = 禁用 */
 const ruleOptions = {
     gfw: true, // 被墙网站
     apple: true, // 苹果服务
@@ -38,7 +35,6 @@ const ruleOptions = {
     ads: true, // 常见的网络广告
 }
 
-/** * 前置规则 * 如果有需要前置的自定义规则，可以自行修改 */
 const rules = [
     'RULE-SET,applications,下载软件',
     'PROCESS-NAME,SunloginClient,DIRECT',
@@ -47,7 +43,6 @@ const rules = [
     'PROCESS-NAME,AnyDesk.exe,DIRECT',
 ]
 
-/** * 地区配置，通过regex匹配代理节点名称 * regex会有一定概率误判，自己调整一下吧 * excludeHighPercentage是排除高倍率节点的开关，只对地区分组有效 * 倍率大于regions里的ratioLimit值的代理节点会被排除 */
 const regionOptions = {
     excludeHighPercentage: true,
     regions: [
@@ -231,9 +226,8 @@ function main(config) {
                         regionGroups[region.name] = []
                     }
                     regionGroups[region.name].push(proxyName)
-                } else if (!isRatioValid) {
-                    // 倍率不符，暂时不处理，让其流入 unclassifiedProxies (或者专门的低倍率组)
-                }
+                } 
+                // 倍率不符的节点将不被分类，保持在 unclassifiedProxies 中
                 matched = true
                 break
             }
@@ -243,8 +237,13 @@ function main(config) {
         }
     })
 
-    // 2. 将未被地区规则匹配的节点从 allProxyNames 中排除（避免重复创建直连）
-    unclassifiedProxies = unclassifiedProxies.filter((x) => !regionGroups.values().flat().includes(x))
+    // 2. 修复 TypeError: not a function 错误。
+    // 使用 Object.values() 获取所有地区代理列表，然后展平
+    const classifiedProxyNames = Object.values(regionGroups).flat();
+    
+    // 过滤掉那些已经被归类到地区组的节点，剩下的才是真正的“未归类”节点
+    unclassifiedProxies = unclassifiedProxies.filter((x) => !classifiedProxyNames.includes(x))
+    
     
     // 3. 定义全局策略组所需的成员列表
     const allRegionManualGroupNames = [] // 地区一级组 (select) 名称
@@ -348,18 +347,16 @@ function main(config) {
     }
     allProxyGroups.push(globalGroup)
 
-    // 7. 处理直连节点 (保持原逻辑，但需要确保在 proxie 列表的末尾)
+    // 7. 处理直连节点 (保持原逻辑)
     config.proxies = config?.proxies || []
     config.proxies.push({ name: '直连', type: 'direct', udp: true })
     
     // 8. 重新生成分流策略组，统一指向 '🚀 选择节点'
-
-    // 所有需要代理的策略组都指向 '🚀 选择节点'
     const proxyTarget = '🚀 选择节点'
     const directTarget = '直连' 
     const domesticTarget = '国内网站'
     
-    // 清空原有的 regionProxyGroups 和 config['proxy-groups']，使用新的 allProxyGroups
+    // 覆盖原配置中的策略组列表
     config['proxy-groups'] = allProxyGroups
 
     rules.push(
