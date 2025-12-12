@@ -3,7 +3,8 @@
  * URL: https://github.com/dahaha-365/YaNet/
  *
  * 修复：TypeError: not a function 错误。
- * 优化：实现策略组的三层嵌套：全局自动/手动入口 -> 地区手动组 -> 地区自动组。
+ * 解决兼容性问题：使用 reduce 替代 .flat() 以提高在 Mihomo/Clash 环境中的兼容性。
+ * 逻辑：实现策略组的三层嵌套：全局自动/手动入口 -> 地区手动组 -> 地区自动组。
  */
 
 const enable = true
@@ -227,7 +228,6 @@ function main(config) {
                     }
                     regionGroups[region.name].push(proxyName)
                 } 
-                // 倍率不符的节点将不被分类，保持在 unclassifiedProxies 中
                 matched = true
                 break
             }
@@ -237,9 +237,9 @@ function main(config) {
         }
     })
 
-    // 2. 修复 TypeError: not a function 错误。
-    // 使用 Object.values() 获取所有地区代理列表，然后展平
-    const classifiedProxyNames = Object.values(regionGroups).flat();
+    // 2. 修复 TypeError: not a function 错误（使用 reduce 替代 flat）
+    // 目标：将 { 'HK': [n1, n2], 'US': [n3] } 转换为 [n1, n2, n3]
+    const classifiedProxyNames = Object.values(regionGroups).reduce((acc, val) => acc.concat(val), []);
     
     // 过滤掉那些已经被归类到地区组的节点，剩下的才是真正的“未归类”节点
     unclassifiedProxies = unclassifiedProxies.filter((x) => !classifiedProxyNames.includes(x))
